@@ -1,0 +1,16 @@
+# Terraform state files – never commit these
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# Variable files with real values – never commit these
+terraform.tfvars
+*.auto.tfvars
+
+# Crash logs
+crash.log
+
+# OS
+.DS_Store
+Thumbs.db
