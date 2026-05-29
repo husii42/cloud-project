@@ -1,0 +1,6 @@
+# Copy this file to terraform.tfvars and adjust the values.
+# terraform.tfvars is listed in .gitignore – never commit it!
+
+project_name = "cloudproject"
+environment  = "dev"
+location     = "swedencentral"
