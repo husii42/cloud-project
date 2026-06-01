@@ -22,7 +22,7 @@ The following tools must be installed before running the Terraform definition:
 - Azure Subscription active A student subscription is sufficient
 ```
 
-### How to Run
+### How to Run (in PowerShell)
 
 ```
 # 1. Clone the repository
