@@ -1,6 +1,6 @@
 # Cloud and DevOps Engineering: Part I
 
-*Aalen University  ·  Infrastructure as Code with Terraform on Azure  ·  Sweden Central*
+*Aalen University  ·  Infrastructure as Code with Terraform on Azure  ·  Hüseyin Simsek  ·  Summer Semester 2026*
 
 
 ## 1. What is this?
