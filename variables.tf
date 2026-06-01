@@ -1,3 +1,7 @@
+# ─────────────────────────────────────────────
+# Defining variables for the project
+# ─────────────────────────────────────────────
+
 variable "project_name" {
   description = "Short name used as prefix for all resources (lowercase, no spaces)"
   type        = string
@@ -16,12 +20,13 @@ variable "location" {
   default     = "swedencentral"
 }
 
-variable "tags" {
+variable "tags" { # tags is adding descriptions to the resources in Azure, so we can easily identify them and filter them in the Azure portal. We can also use tags for cost management and automation.
   description = "Tags applied to all resources"
   type        = map(string)
   default = {
     project     = "cloud-devops-engineering"
-    university  = "Aalen"
     managed_by  = "terraform"
+    creator = "Simsek"
+    for = "learning"
   }
 }

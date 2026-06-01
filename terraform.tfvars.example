@@ -1,5 +1,4 @@
-# Copy this file to terraform.tfvars and adjust the values.
-# terraform.tfvars is listed in .gitignore – never commit it!
+# Enter your variables here. Please note that project_name must be globally unique and contain only lowercase letters and numbers
 
 project_name = "cloudproject"
 environment  = "dev"

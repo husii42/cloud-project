@@ -3,8 +3,8 @@ resource "azurerm_service_plan" "main" {
   name                = "asp-${var.project_name}-${var.environment}"
   location            = var.location
   resource_group_name = var.resource_group_name
-  os_type             = "Linux"
-  sku_name            = "B1" # Basic tier – cheapest billable plan; free tier (F1) has no always-on
+  os_type             = "Linux" # Cheaper thgan Windows plans, and better for Python apps
+  sku_name            = "B1" # Basic tier – cheapest billable plan; free tier (F1) has no always-on. Always-on is required for the app to stay responsive, so B1 is the cheapest viable option.
 
   tags = var.tags
 }
@@ -25,14 +25,14 @@ resource "azurerm_linux_web_app" "main" {
     always_on = true
 
     application_stack {
-      python_version = "3.11" # Part II web app will use Python (Flask / FastAPI)
+      python_version = "3.11" # Part II web app will use Python (Flask / FastAPI), as Python is the only language I know
     }
   }
 
   # App Settings – Part II will add AZURE_STORAGE_* and KEY_VAULT_URI here
   app_settings = {
     "WEBSITES_ENABLE_APP_SERVICE_STORAGE" = "false"
-    "SCM_DO_BUILD_DURING_DEPLOYMENT"      = "true"
+    "SCM_DO_BUILD_DURING_DEPLOYMENT"      = "true" # to install Python packages automatically every time the code is updated 
   }
 
   tags = var.tags

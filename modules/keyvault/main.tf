@@ -4,14 +4,14 @@ resource "azurerm_key_vault" "main" {
   location                    = var.location
   resource_group_name         = var.resource_group_name
   tenant_id                   = var.tenant_id
-  sku_name                    = "standard"
-  soft_delete_retention_days  = 7
-  purge_protection_enabled    = false # Keep false for dev/student environments
+  sku_name                    = "standard" # Cheapest SKU, sufficient for this demo
+  soft_delete_retention_days  = 7 # Minimum retention period for soft-deleted vaults, required by Azure (cannot be set to 0 or disabled).
+  purge_protection_enabled    = false # For university exercises, we disable purge protection to allow quick cleanup. In production, you would likely want to enable it for better security.
 
   tags = var.tags
 }
 
-# Grant the current CLI user full access to the Key Vault
+# Grant the current CLI user full access to the Key Vault 
 resource "azurerm_key_vault_access_policy" "current_user" {
   key_vault_id = azurerm_key_vault.main.id
   tenant_id    = var.tenant_id

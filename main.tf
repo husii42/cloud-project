@@ -1,5 +1,5 @@
 # ─────────────────────────────────────────────
-# Data – current Azure CLI identity
+# Checking the Azure account which is logged in
 # ─────────────────────────────────────────────
 data "azurerm_client_config" "current" {}
 
@@ -16,7 +16,7 @@ resource "azurerm_resource_group" "main" {
 # Module: Storage Account
 # ─────────────────────────────────────────────
 module "storage" {
-  source = "./modules/storage"
+  source = "./modules/storage" # --> with source terraform knows where the code for storage account is located
 
   project_name        = var.project_name
   environment         = var.environment
@@ -37,7 +37,7 @@ module "keyvault" {
   resource_group_name       = azurerm_resource_group.main.name
   tenant_id                 = data.azurerm_client_config.current.tenant_id
   object_id                 = data.azurerm_client_config.current.object_id
-  storage_connection_string = module.storage.primary_access_key
+  storage_connection_string = module.storage.primary_access_key # --> we can use the output from the storage module as input for the keyvault module  
   tags                      = var.tags
 }
 
