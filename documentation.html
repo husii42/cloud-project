@@ -109,13 +109,6 @@
     <tr><td>Azure Subscription</td><td>active</td><td>A student subscription is sufficient</td></tr>
   </table>
 
-  <div class="note">
-    On Windows, if PowerShell does not recognise the <code>terraform</code> command after installation,
-    add the installation path manually to the system PATH:
-    <pre>$env:path += ";C:\Program Files\Terraform"</pre>
-    Restart PowerShell afterwards.
-  </div>
-
   <h3>How to Run</h3>
   <pre># 1. Clone the repository
 git clone https://github.com/husii42/cloud-project.git
@@ -123,7 +116,6 @@ cd cloud-project
 
 # 2. (Windows only) Add Terraform to PATH if not recognised
 $env:path += ";C:\Program Files\Terraform"
-# Restart PowerShell afterwards
 
 # 3. Create the variables file and set a unique project_name
 cp terraform.tfvars.example terraform.tfvars

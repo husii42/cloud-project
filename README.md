@@ -16,9 +16,11 @@ The following Azure resources are created:
 The following tools must be installed before running the Terraform definition:
 
 ```
-$env:path += ";C:\Program Files\Terraform"
+- Terraform ≥ 1.5.0 https://developer.hashicorp.com/terraform/install
+- Azure CLI latest https://learn.microsoft.com/cli/azure/install-azure-cli
+- Git any https://git-scm.com
+- Azure Subscription active A student subscription is sufficient
 ```
-
 
 ### How to Run
 
@@ -29,7 +31,6 @@ cd cloud-project
 
 # 2. (Windows only) Add Terraform to PATH if not recognised
 $env:path += ";C:\Program Files\Terraform"
-# Restart PowerShell afterwards
 
 # 3. Create the variables file and set a unique project_name
 cp terraform.tfvars.example terraform.tfvars
