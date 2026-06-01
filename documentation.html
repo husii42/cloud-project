@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cloud & DevOps Project – Documentation</title>
+  <title>Cloud and DevOps Project: Documentation</title>
   <style>
     body {
       font-family: Georgia, serif;
@@ -78,13 +78,13 @@
 </head>
 <body>
 
-  <h1>Cloud & DevOps Engineering – Part I</h1>
-  <p class="subtitle">Aalen University &nbsp;·&nbsp; Infrastructure as Code with Terraform on Azure &nbsp;·&nbsp; Hüseyin Simsek</p>
+  <h1>Cloud and DevOps Engineering: Part I</h1>
+  <p class="subtitle">Aalen University &nbsp;·&nbsp; Infrastructure as Code with Terraform on Azure &nbsp;·&nbsp; Sweden Central</p>
 
   <!-- 1. WHAT IS THIS -->
   <h2>1. What is this?</h2>
   <p>
-    This project provisions a cloud infrastructure on Microsoft Azure using Terraform — an Infrastructure as Code (IaC) tool.
+    This project provisions a cloud infrastructure on Microsoft Azure using Terraform, an Infrastructure as Code (IaC) tool.
     Instead of manually creating resources in the Azure Portal, everything is defined in code and deployed automatically.
   </p>
   <p>The following Azure resources are created:</p>
@@ -149,7 +149,7 @@ terraform apply</pre>
   <!-- 3. REPOSITORY STRUCTURE -->
   <h2>3. Repository Structure</h2>
   <pre>cloud-project/
-├── main.tf                   # Root module – connects all modules together
+├── main.tf                   # Root module: connects all modules together
 ├── variables.tf              # Input variables (project_name, environment, location)
 ├── outputs.tf                # Values displayed after terraform apply
 ├── providers.tf              # Azure provider version and configuration
@@ -170,37 +170,13 @@ terraform apply</pre>
         └── outputs.tf        # Exports hostname and Managed Identity ID</pre>
 
   <h3>How the files work together</h3>
-<p>
-  The flow starts with <code>terraform.tfvars</code>, which provides the actual values
-  (project name, region, environment). <code>variables.tf</code> defines which values
-  are expected and sets default values if none are provided.
-</p>
-<p>
-  <code>providers.tf</code> tells Terraform which cloud provider to use (Azure) and
-  which version of the provider to download during <code>terraform init</code>.
-  It also configures the Azure CLI as the authentication method — no credentials
-  need to be stored in any file.
-</p>
-<p>
-  <code>main.tf</code> is the orchestrator. It creates the Resource Group directly
-  and then calls each module, passing the required values as inputs. It also connects
-  module outputs to other modules where needed — for example, the Storage Account
-  access key is read from the storage module output and passed into the Key Vault
-  module as an input, which then stores it as a secret automatically.
-</p>
-<p>
-  Each module follows the same pattern:
-</p>
-<pre>variables.tf   ← receives inputs from root main.tf
-main.tf        ← uses those inputs to create Azure resources
-outputs.tf     ← exposes values that root main.tf or other modules can use</pre>
-<p>
-  After <code>terraform apply</code> completes, <code>outputs.tf</code> in the root
-  module collects the most relevant values from each module — such as the Storage
-  Account name, Key Vault URI, and Web App hostname — and displays them in the terminal.
-  This gives an immediate overview of all deployed resources without having to open
-  the Azure Portal.
-</p>
+  <p>
+    <code>terraform.tfvars</code> provides the values (project name, region, environment).
+    <code>variables.tf</code> defines which values are expected.
+    <code>main.tf</code> passes those values into each module and connects their outputs —
+    for example, the Storage Account access key is read from the storage module and passed directly into the Key Vault module, which stores it as a secret.
+    After deployment, <code>outputs.tf</code> displays all relevant resource names and URLs in the terminal.
+  </p>
 
   <!-- 4. APPROACH -->
   <h2>4. Approach & Reasoning</h2>
@@ -208,34 +184,34 @@ outputs.tf     ← exposes values that root main.tf or other modules can use</pr
   <h3>Modular structure</h3>
   <p>
     The infrastructure is split into three modules (Storage, Key Vault, App Service) rather than placing everything in a single <code>main.tf</code> file.
-    Each module is responsible for exactly one concern — it receives input variables, creates its resources, and exposes outputs.
+    Each module is responsible for exactly one concern: it receives input variables, creates its resources, and exposes outputs.
     The root <code>main.tf</code> acts as the orchestrator: it passes values into each module and connects their outputs where needed.
   </p>
   <p>
     This separation has a practical benefit for this project: in Part II, nothing in the existing code needs to be modified.
     New resources, pipeline configuration, and application settings are simply added on top.
-    Had everything been written in one file, adding Part II would require editing existing resources — which risks unintended changes or data loss.
+    Had everything been written in one file, adding Part II would require editing existing resources, which risks unintended changes or data loss.
   </p>
 
   <h3>Key Vault for sensitive data</h3>
   <p>
-    The Storage Account access key is a sensitive credential — anyone who holds it has full read and write access to the storage.
+    The Storage Account access key is a sensitive credential: anyone who holds it has full read and write access to the storage.
     Storing it directly in application code or committing it to Git would expose it to anyone with access to the repository.
   </p>
   <p>
     Instead, Terraform reads the access key from the Storage Account after creation and stores it automatically as a secret in Azure Key Vault.
-    The application in Part II will retrieve this secret at runtime — meaning the actual credential never appears in code or configuration files.
+    The application in Part II will retrieve this secret at runtime, meaning the actual credential never appears in code or configuration files.
     Access to the Key Vault is controlled via Access Policies: the developer has full access during deployment, and the App Service will be granted read-only access in Part II.
   </p>
 
   <h3>Managed Identity instead of passwords</h3>
   <p>
     A common approach for giving an application access to Azure resources is to create a service principal with a client secret (essentially a username and password).
-    The problem with this approach is that the secret needs to be stored somewhere — in environment variables, configuration files, or a pipeline — which creates another credential that can be accidentally exposed.
+    The problem with this approach is that the secret needs to be stored somewhere: in environment variables, configuration files, or a pipeline, which creates another credential that can be accidentally exposed.
   </p>
   <p>
     By assigning the App Service a System-Assigned Managed Identity, Azure manages the authentication automatically.
-    The application proves its identity to the Key Vault through Azure's internal infrastructure — no password is ever created, stored, or rotated manually.
+    The application proves its identity to the Key Vault through Azure's internal infrastructure, so no password is ever created, stored, or rotated manually.
     This removes an entire category of credential management from the project.
   </p>
 
@@ -252,13 +228,13 @@ outputs.tf     ← exposes values that root main.tf or other modules can use</pr
   <h3>Upload authentication</h3>
   <p>
     The Storage Account currently permits GET, POST and PUT requests from any origin via CORS.
-    This is intentional at the infrastructure level — the Storage Account itself does not need to know who is allowed to upload files, because uploads do not go directly from the browser to Azure Storage.
+    This is intentional at the infrastructure level: the Storage Account itself does not need to know who is allowed to upload files, because uploads do not go directly from the browser to Azure Storage.
     Instead, the request flows through the App Service, which acts as an intermediary:
   </p>
   <pre>Browser → App Service → Storage Account</pre>
   <p>
     The App Service is the only component that communicates directly with the Storage Account.
-    Authentication — deciding whether a specific user is allowed to upload — is therefore handled in the application code in Part II, not by Terraform.
+    Authentication, meaning deciding whether a specific user is allowed to upload, is therefore handled in the application code in Part II, not by Terraform.
     Terraform governs access at the Azure infrastructure level; the application governs access at the user level.
   </p>
 
@@ -281,7 +257,7 @@ outputs.tf     ← exposes values that root main.tf or other modules can use</pr
   <h3>Local Terraform state</h3>
   <p>
     The Terraform state file (<code>terraform.tfstate</code>) is stored locally on the developer's machine.
-    This means only the person who ran <code>terraform apply</code> can manage the infrastructure — and if the file is lost, Terraform loses track of all created resources.
+    This means only the person who ran <code>terraform apply</code> can manage the infrastructure, and if the file is lost, Terraform loses track of all created resources.
     In a production setup, the state would be stored remotely in an Azure Storage Account (Remote Backend).
     However, this introduces a chicken-and-egg problem: the Storage Account is created by Terraform, but Terraform needs the Storage Account to exist before it can start.
     The solution is to create a separate Storage Account manually in the Azure Portal solely for the state, before running Terraform for the first time.
@@ -291,7 +267,7 @@ outputs.tf     ← exposes values that root main.tf or other modules can use</pr
   <h3>Public blob container</h3>
   <p>
     The images container is set to public blob access, meaning anyone who knows the URL of a file can access it directly.
-    For sensitive data this would be a problem. For this project — which stores images intended to be displayed on a public web page — public read access is intentional.
+    For sensitive data this would be a problem. For this project, which stores images intended to be displayed on a public web page, public read access is intentional.
   </p>
 
   <h3>No monitoring</h3>
@@ -302,7 +278,7 @@ outputs.tf     ← exposes values that root main.tf or other modules can use</pr
   </p>
 
   <!-- 6. OUTLOOK PART II -->
-  <h2>6. Outlook – Part II</h2>
+  <h2>6. Outlook: Part II</h2>
   <p>Part II extends this infrastructure with application code and a deployment pipeline. The following will be added:</p>
   <table>
     <tr><th>Component</th><th>Description</th></tr>
@@ -313,11 +289,11 @@ outputs.tf     ← exposes values that root main.tf or other modules can use</pr
     <tr><td>App Settings</td><td>KEY_VAULT_URI and STORAGE_CONTAINER_NAME added to the Web App configuration</td></tr>
   </table>
   <p>
-    The infrastructure defined in Part I requires no changes — Part II only adds to it.
+    The infrastructure defined in Part I requires no changes. Part II only adds to it.
   </p>
 
   <footer>
-    Cloud & DevOps Engineering &nbsp;·&nbsp; Aalen University &nbsp;·&nbsp; Part I &nbsp;·&nbsp; Terraform on Azure
+    Cloud & DevOps Engineering &nbsp;·&nbsp; Aalen University &nbsp;·&nbsp; Part I · Terraform on Azure
   </footer>
 
 </body>

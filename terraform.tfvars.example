@@ -1,5 +1,7 @@
 # Enter your variables here. Please note that project_name must be globally unique and contain only lowercase letters and numbers
-
 project_name = "cloudproject"
+
 environment  = "dev"
+
+# Please enter a location that works for you
 location     = "swedencentral"
