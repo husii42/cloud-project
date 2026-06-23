@@ -24,9 +24,9 @@ variable "tags" { # tags is adding descriptions to the resources in Azure, so we
   description = "Tags applied to all resources"
   type        = map(string)
   default = {
-    project     = "cloud-devops-engineering"
-    managed_by  = "terraform"
-    creator = "Simsek"
-    for = "learning"
+    project    = "cloud-devops-engineering"
+    managed_by = "terraform"
+    creator    = "Simsek"
+    "for"      = "learning"
   }
 }

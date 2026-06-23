@@ -29,3 +29,15 @@ resource "azurerm_storage_container" "images" {
   storage_account_name  = azurerm_storage_account.main.name
   container_access_type = "blob" # Public read for blobs (images accessible via URL)
 }
+
+# ─────────────────────────────────────────────
+# Part II: Allow the Web App's Managed Identity to read/write blobs
+# without using the access key. "Storage Blob Data Contributor" grants
+# read, write and delete access to blobs, but not to account keys or
+# account-level settings (least privilege for what the app actually does).
+# ─────────────────────────────────────────────
+resource "azurerm_role_assignment" "web_app_blob_access" {
+  scope                = azurerm_storage_account.main.id
+  role_definition_name = "Storage Blob Data Contributor"
+  principal_id         = var.web_app_principal_id
+}

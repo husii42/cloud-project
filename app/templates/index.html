@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Files{% endblock %}
+
+{% block content %}
+  <h1>Files in Storage</h1>
+  <p class="subtitle">
+    All files currently stored in the Blob Storage container.
+    <a href="{{ url_for('upload') }}" class="button">+ Upload a new file</a>
+  </p>
+
+  {% if error %}
+    <div class="flash flash-error">
+      Could not load files: {{ error }}
+    </div>
+  {% elif files|length == 0 %}
+    <p class="empty-state">No files have been uploaded yet.</p>
+  {% else %}
+    <table class="file-table">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Size</th>
+          <th>Last modified</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for file in files %}
+          <tr>
+            <td>{{ file.name }}</td>
+            <td>{{ file.size }}</td>
+            <td>{{ file.last_modified }}</td>
+            <td><a href="{{ file.url }}" class="button button-small" download>Download</a></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+{% endblock %}

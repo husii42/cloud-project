@@ -32,3 +32,8 @@ variable "storage_connection_string" {
 variable "tags" {
   type = map(string)
 }
+
+variable "web_app_principal_id" {
+  description = "Principal ID of the Web App's System-Assigned Managed Identity (Part II). Used to grant read-only secret access without storing credentials."
+  type        = string
+}

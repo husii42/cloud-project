@@ -26,6 +26,21 @@ resource "azurerm_key_vault_access_policy" "current_user" {
   ]
 }
 
+# ─────────────────────────────────────────────
+# Part II: Allow the Web App's Managed Identity to read secrets.
+# Read-only ("Get", "List") is sufficient because the application only
+# needs to retrieve secrets at runtime, never create or delete them.
+# ─────────────────────────────────────────────
+resource "azurerm_key_vault_access_policy" "web_app" {
+  key_vault_id = azurerm_key_vault.main.id
+  tenant_id    = var.tenant_id
+  object_id    = var.web_app_principal_id
+
+  secret_permissions = [
+    "Get", "List"
+  ]
+}
+
 # Store the Storage Account connection string as a secret (Part II will read this)
 resource "azurerm_key_vault_secret" "storage_connection_string" {
   name         = "storage-connection-string"

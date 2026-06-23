@@ -1,4 +1,4 @@
-# Cloud and DevOps Engineering: Part I
+# Cloud and DevOps Engineering: Part I & II
 
 *Aalen University  ·  Infrastructure as Code with Terraform on Azure  ·  Hüseyin Simsek  ·  Summer Semester 2026*
 
@@ -180,9 +180,112 @@ There are no alerts, diagnostics, or logging resources configured.
     In a production setup, Azure Monitor and Application Insights would be added to the infrastructure.
 
 
-## 6. Outlook: Part II
+## 6. Part II: Application & Deployment Pipeline
 
-Part II extends this infrastructure with application code and a deployment pipeline. The following will be added:
+Part II adds the application layer and CI/CD pipeline on top of the Part I infrastructure.
+    No resources defined in Part I were modified in a destructive way; only new resources
+    (role assignments, access policies, app settings) and a new `app/` directory were added.
 
-The infrastructure defined in Part I requires no changes. Part II only adds to it.
+
+### 6.1 Description
+
+The application is a small Flask web app with two pages:
+
+- **Web Page 1 (`/`)**: lists every file currently stored in the Blob Storage container,
+    showing its name, size and last-modified date, with a direct download link for each file.
+    It also links to Web Page 2.
+- **Web Page 2 (`/upload`)**: a form that lets a user choose a file and upload it to the
+    same Blob Storage container.
+
+The app is packaged and deployed automatically by a GitHub Actions pipeline whenever the
+    application code changes on the `main` branch.
+
+
+### 6.2 Approach
+
+```
+Browser → Web Page 1 / Web Page 2 → Flask App (App Service) → Blob Storage Container
+```
+
+The Flask app is the only component that talks to Azure directly. The browser never
+    receives any Azure credential; it only ever talks to the Flask app, which in turn
+    authenticates to Storage on the app's own identity. This matches the approach already
+    described in Part I (`Upload authentication`): the Storage Account does not need to know
+    who is allowed to upload, because the App Service sits between the browser and the storage.
+
+The Python `azure-storage-blob` and `azure-identity` SDKs are used. `DefaultAzureCredential`
+    automatically uses the Web App's Managed Identity when running on Azure, and falls back to
+    the developer's own `az login` session when running locally — so the same code works in
+    both places without any code change or local secret.
+
+
+### 6.3 Connections between resources
+
+| From | To | How |
+|------|----|-----|
+| Web App (Managed Identity) | Storage Account | `azurerm_role_assignment` granting "Storage Blob Data Contributor" on the Storage Account, scoped to the Web App's `principal_id` |
+| Web App (Managed Identity) | Key Vault | `azurerm_key_vault_access_policy` granting `Get`/`List` on secrets, scoped to the Web App's `principal_id` |
+| Web App | Storage Account / Key Vault names | Passed in as App Settings (`AZURE_STORAGE_ACCOUNT_NAME`, `AZURE_STORAGE_CONTAINER_NAME`, `KEY_VAULT_URI`) so the app code never hardcodes resource names |
+| GitHub Actions | Azure subscription | OIDC / Workload Identity Federation (no stored client secret); see `deployment-notes.md` |
+| GitHub Actions | Web App | `azure/webapps-deploy` action pushes the packaged Flask app to the App Service |
+
+A note on module wiring in Terraform: `module.appservice` is evaluated independently of
+    `module.storage` and `module.keyvault` (it only needs the Resource Group), while both of
+    those modules depend on `module.appservice.managed_identity_principal_id` to grant access.
+    The Key Vault URI and Storage Account name passed into `appservice` are computed directly
+    from the shared naming convention (`var.project_name` / `var.environment`) rather than read
+    back from the other modules' outputs — referencing those outputs directly would create a
+    circular dependency between modules (`appservice → keyvault → appservice`), which Terraform
+    cannot resolve.
+
+
+### 6.4 Authentication / Identity context
+
+No credential (key, password, or connection string) is stored in the application code,
+    GitHub repository secrets, or App Service configuration:
+
+- **App → Storage**: System-Assigned Managed Identity, granted the **Storage Blob Data
+    Contributor** role (read/write/delete blobs only — not account keys or account-level
+    settings, following least privilege).
+- **App → Key Vault**: same Managed Identity, granted read-only (`Get`, `List`) secret access.
+    The app does not currently need to read any Key Vault secret at runtime (it authenticates
+    to Storage via the Managed Identity directly), but the access policy demonstrates the same
+    identity can be used uniformly across both resources. The Storage Account access key
+    remains stored in Key Vault as in Part I, purely as a demonstration of the secret-management
+    pattern — it is not read by the application.
+- **GitHub Actions → Azure**: OIDC / Workload Identity Federation. GitHub issues a short-lived
+    signed token per workflow run; Azure AD trusts it for this specific repository and branch
+    and exchanges it for a short-lived Azure access token. See `deployment-notes.md` for the
+    one-time setup.
+- **Browser → App**: no authentication is implemented at this layer (anyone with the URL can
+    upload). This mirrors the Part I decision that upload authorization is an application-level
+    concern, and is acceptable for this project's scope (see Known Limitations).
+
+
+### 6.5 Repository structure addition
+
+```
+cloud-project/
+├── app/
+│   ├── app.py                 # Flask application (both pages + health check)
+│   ├── requirements.txt       # Python dependencies
+│   ├── templates/             # Jinja2 templates (base, index, upload)
+│   └── static/style.css        # Shared styling
+├── .github/workflows/
+│   └── deploy.yml             # CI/CD pipeline: build → test → deploy → verify
+└── deployment-notes.md        # One-time OIDC setup instructions
+```
+
+
+### 6.6 Known limitations (Part II)
+
+- No upload authentication at the application layer (see 6.4) — acceptable for this
+    project's scope, since the goal is to demonstrate the infrastructure and identity
+    pattern, not a production-grade access control system.
+- The Key Vault secret holding the Storage Account access key is unused by the application
+    code; it is retained from Part I purely to show the secret-storage pattern still works
+    alongside Managed Identity access.
+- The pipeline deploys directly to a single environment (`dev`); there is no staging slot
+    or blue-green deployment, consistent with the single-environment scope from Part I.
+
 

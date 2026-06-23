@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Upload{% endblock %}
+
+{% block content %}
+  <h1>Upload a File</h1>
+  <p class="subtitle">
+    Choose an image or document to upload to Blob Storage.
+    <a href="{{ url_for('index') }}">&larr; Back to file list</a>
+  </p>
+
+  <form method="post" action="{{ url_for('upload') }}" enctype="multipart/form-data" class="upload-form">
+    <label for="file" class="file-drop">
+      <input type="file" id="file" name="file" required />
+      <span>Click to choose a file, or drag one here</span>
+    </label>
+    <button type="submit" class="button button-primary">Upload</button>
+  </form>
+
+  <p class="hint">Allowed types: png, jpg, jpeg, gif, webp, bmp, txt, pdf</p>
+{% endblock %}
