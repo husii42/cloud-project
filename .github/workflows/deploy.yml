@@ -2,7 +2,7 @@ name: Build and Deploy to Azure App Service
 
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]
     paths:
       - "app/**"
       - ".github/workflows/deploy.yml"
