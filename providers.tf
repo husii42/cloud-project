@@ -6,7 +6,30 @@ terraform {
       source  = "hashicorp/azurerm"
       version = "~> 3.100"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.6"
+    }
   }
+
+  # ───────────────────────────────────────────
+  # Remote state backend (optional, see bootstrap/main.tf)
+  # ───────────────────────────────────────────
+  # Left commented out by default so the project keeps working with local
+  # state out of the box. To migrate to remote state:
+  #   1. cd bootstrap && terraform init && terraform apply
+  #   2. Copy the values from `terraform output backend_config_snippet`
+  #      into the block below and uncomment it
+  #   3. Run `terraform init` again in the project root - Terraform will
+  #      detect the new backend and offer to copy the existing local state
+  #      into it automatically.
+  #
+  # backend "azurerm" {
+  #   resource_group_name  = "rg-<project_name>-tfstate"
+  #   storage_account_name = "sttfstate<project_name><suffix>"
+  #   container_name       = "tfstate"
+  #   key                  = "terraform.tfstate"
+  # }
 }
 
 provider "azurerm" {

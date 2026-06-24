@@ -157,14 +157,43 @@ The infrastructure currently only has a single environment ( dev ).
     For this project scope, a single environment is sufficient.
 
 
-### Local Terraform state
+### Remote Terraform state (addressed)
 
-The Terraform state file ( terraform.tfstate ) is stored locally on the developer's machine.
-    This means only the person who ran terraform apply can manage the infrastructure, and if the file is lost, Terraform loses track of all created resources.
-    In a production setup, the state would be stored remotely in an Azure Storage Account (Remote Backend).
-    However, this introduces a chicken-and-egg problem: the Storage Account is created by Terraform, but Terraform needs the Storage Account to exist before it can start.
-    The solution is to create a separate Storage Account manually in the Azure Portal solely for the state, before running Terraform for the first time.
-    For this project, local state is acceptable as it is managed by a single developer.
+Originally, the Terraform state file (`terraform.tfstate`) was stored only locally on the developer's machine, meaning
+    only the person who ran `terraform apply` could manage the infrastructure, and a lost file would mean Terraform losing
+    track of all created resources. This has since been addressed with a `bootstrap/` configuration: a small, separate
+    Terraform setup that creates a dedicated Storage Account solely for holding the main project's state, solving the
+    chicken-and-egg problem where the main Storage Account is created by Terraform but a remote backend needs a Storage
+    Account to exist first. See `bootstrap/main.tf` and the commented-out `backend "azurerm" {}` block in `providers.tf`
+    for the exact migration steps. The bootstrap configuration's own state remains local, since it consists of a handful
+    of resources that essentially never change after creation.
+
+
+### Globally unique resource names (addressed)
+
+Storage Account and Key Vault names must be unique across all of Azure, not just within this subscription. Relying on
+    `project_name` alone risked a naming collision with someone else's resource of the same name. A `random_string` resource
+    now generates a short suffix once (kept stable in the state file across subsequent applies) and appends it to both
+    names, e.g. `stcloudprojectdevab12c`.
+
+
+### Consistent authorization model (addressed)
+
+Storage access for the Web App's Managed Identity was already implemented as an Azure RBAC role assignment
+    (`Storage Blob Data Contributor`). Key Vault access, however, originally used the older, Key-Vault-specific
+    Access Policy model instead of RBAC — two different authorization systems within the same project. The Key Vault
+    now has `enable_rbac_authorization = true`, and both the developer's own access (`Key Vault Administrator`) and the
+    Web App's access (`Key Vault Secrets User`) are granted via `azurerm_role_assignment`, consistent with the Storage Account.
+
+
+### Deployment identity (addressed, optional)
+
+By default, `terraform apply` is run authenticated as the developer's own Azure AD user via `az login`. As an alternative,
+    `spn-deployment-notes.md` documents creating a dedicated Service Principal for Terraform deployments specifically —
+    separate from the Service Principal used by the GitHub Actions pipeline, since the two serve different actors and purposes
+    (a human running Terraform locally vs. an automated pipeline deploying application code). This is offered as an option
+    rather than a requirement, since a single-developer student project does not strictly need this separation, but it
+    demonstrates the pattern used in team/production settings.
 
 
 ### Public blob container
@@ -273,7 +302,10 @@ cloud-project/
 │   └── static/style.css        # Shared styling
 ├── .github/workflows/
 │   └── deploy.yml             # CI/CD pipeline: build → test → deploy → verify
-└── deployment-notes.md        # One-time OIDC setup instructions
+├── bootstrap/
+│   └── main.tf                 # Separate config: creates the remote-state Storage Account
+├── deployment-notes.md        # One-time OIDC setup instructions (GitHub Actions)
+└── spn-deployment-notes.md    # Optional: dedicated Service Principal for `terraform apply`
 ```
 
 

@@ -22,3 +22,8 @@ variable "web_app_principal_id" {
   description = "Principal ID of the Web App's System-Assigned Managed Identity (Part II). Used to grant Blob Data access without storing credentials."
   type        = string
 }
+
+variable "random_suffix" {
+  description = "Random suffix (shared across storage and key vault) to guarantee a globally unique resource name."
+  type        = string
+}

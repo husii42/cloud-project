@@ -78,14 +78,15 @@
 </head>
 <body>
 
-  <h1>Cloud and DevOps Engineering: Part I</h1>
+  <h1>Cloud and DevOps Engineering: Part I &amp; II</h1>
   <p class="subtitle">Aalen University &nbsp;·&nbsp; Infrastructure as Code with Terraform on Azure &nbsp;·&nbsp; Hüseyin Simsek &nbsp;·&nbsp; Summer Semester 2026</p>
 
   <!-- 1. WHAT IS THIS -->
   <h2>1. What is this?</h2>
   <p>
-    This project provisions a cloud infrastructure on Microsoft Azure using Terraform, an Infrastructure as Code (IaC) tool.
-    Instead of manually creating resources in the Azure Portal, everything is defined in code and deployed automatically.
+    This project provisions a cloud infrastructure on Microsoft Azure using Terraform, an Infrastructure as Code (IaC) tool,
+    and deploys a small Flask web application on top of it. Part I defines the infrastructure; Part II adds the application
+    code, the identity-based access between the app and its resources, and a CI/CD pipeline that builds and deploys the app automatically.
   </p>
   <p>The following Azure resources are created:</p>
   <table>
@@ -95,17 +96,24 @@
     <tr><td>Storage Container</td><td>images</td><td>Blob container inside the Storage Account</td></tr>
     <tr><td>Key Vault</td><td>kv-&lt;name&gt;-dev</td><td>Stores sensitive credentials securely</td></tr>
     <tr><td>App Service Plan</td><td>asp-&lt;name&gt;-dev</td><td>The underlying compute for the web app</td></tr>
-    <tr><td>Web App</td><td>app-&lt;name&gt;-dev</td><td>Hosts the web application (Part II)</td></tr>
+    <tr><td>Web App</td><td>app-&lt;name&gt;-dev</td><td>Hosts the Flask web application</td></tr>
+  </table>
+  <p>The web application itself provides two pages:</p>
+  <table>
+    <tr><th>Page</th><th>Route</th><th>Purpose</th></tr>
+    <tr><td>Web Page 1</td><td><code>/</code></td><td>Lists all files in the Storage Account, each with a direct download link</td></tr>
+    <tr><td>Web Page 2</td><td><code>/upload</code></td><td>Upload form to add a new file/image to the Storage Account</td></tr>
   </table>
 
   <!-- 2. PREREQUISITES -->
   <h2>2. Prerequisites</h2>
-  <p>The following tools must be installed before running the Terraform definition:</p>
+  <p>The following tools must be installed before running the Terraform definition or the application locally:</p>
   <table>
     <tr><th>Tool</th><th>Version</th><th>Download</th></tr>
     <tr><td>Terraform</td><td>≥ 1.5.0</td><td>https://developer.hashicorp.com/terraform/install</td></tr>
     <tr><td>Azure CLI</td><td>latest</td><td>https://learn.microsoft.com/cli/azure/install-azure-cli</td></tr>
     <tr><td>Git</td><td>any</td><td>https://git-scm.com</td></tr>
+    <tr><td>Python</td><td>3.11</td><td>https://www.python.org/downloads</td></tr>
     <tr><td>Azure Subscription</td><td>active</td><td>A student subscription is sufficient</td></tr>
   </table>
 
@@ -138,6 +146,34 @@ terraform apply</pre>
     it becomes part of the Storage Account name (e.g. <code>stmyname42dev</code>).
   </div>
 
+  <h3>Deploying the application</h3>
+  <p>
+    The application itself is not deployed by Terraform directly. Instead, a GitHub Actions pipeline builds and deploys it
+    automatically whenever the <code>app/</code> directory changes on the <code>master</code> branch.
+    This requires a one-time setup of an OIDC trust relationship between GitHub and Azure, described in full in
+    <code>deployment-notes.md</code>. The short version:
+  </p>
+  <pre># 1. Register an Azure AD application for GitHub Actions to authenticate as
+az ad app create --display-name "github-cloud-project-deploy"
+az ad sp create --id &lt;appId&gt;
+
+# 2. Grant it permission to deploy to the resource group
+az role assignment create --assignee &lt;appId&gt; --role "Website Contributor" `
+  --scope /subscriptions/&lt;sub-id&gt;/resourceGroups/rg-&lt;name&gt;-dev
+
+# 3. Create federated credentials so GitHub tokens are trusted (no stored secret)
+az ad app federated-credential create --id &lt;appId&gt; --parameters '{...subject: repo:.../ref:refs/heads/master...}'
+az ad app federated-credential create --id &lt;appId&gt; --parameters '{...subject: repo:.../environment:production...}'
+
+# 4. Add AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID as GitHub repository secrets</pre>
+
+  <div class="note">
+    Two federated credentials are needed, not one: the pipeline's <code>deploy</code> job is tied to a GitHub
+    <em>environment</em> (<code>production</code>), which changes the subject string GitHub presents to Azure AD compared to
+    a plain branch push. Without the second credential, the login step fails with
+    <code>AADSTS700213: No matching federated identity record found</code>.
+  </div>
+
   <!-- 3. REPOSITORY STRUCTURE -->
   <h2>3. Repository Structure</h2>
   <pre>cloud-project/
@@ -146,10 +182,19 @@ terraform apply</pre>
 ├── outputs.tf                # Values displayed after terraform apply
 ├── providers.tf              # Azure provider version and configuration
 ├── terraform.tfvars.example  # Template for local variables (copy to .tfvars)
+├── deployment-notes.md       # One-time OIDC setup instructions for the pipeline
 ├── .gitignore                # Excludes state files and .tfvars from Git
+├── .github/
+│   └── workflows/
+│       └── deploy.yml        # CI/CD pipeline: build → test → deploy → verify
+├── app/
+│   ├── app.py                 # Flask application (both pages + health check)
+│   ├── requirements.txt       # Python dependencies
+│   ├── templates/             # Jinja2 templates (base, index, upload)
+│   └── static/style.css        # Shared styling
 └── modules/
     ├── storage/
-    │   ├── main.tf           # Creates Storage Account and images container
+    │   ├── main.tf           # Creates Storage Account, images container, role assignment
     │   ├── variables.tf      # Input variables for the module
     │   └── outputs.tf        # Exports storage name, endpoint, access key
     ├── keyvault/
@@ -157,7 +202,7 @@ terraform apply</pre>
     │   ├── variables.tf      # Input variables for the module
     │   └── outputs.tf        # Exports Key Vault name and URI
     └── appservice/
-        ├── main.tf           # Creates App Service Plan and Web App
+        ├── main.tf           # Creates App Service Plan, Web App, app settings
         ├── variables.tf      # Input variables for the module
         └── outputs.tf        # Exports hostname and Managed Identity ID</pre>
 
@@ -167,11 +212,14 @@ terraform apply</pre>
     <code>variables.tf</code> defines which values are expected.
     <code>main.tf</code> passes those values into each module and connects their outputs —
     for example, the Storage Account access key is read from the storage module and passed directly into the Key Vault module, which stores it as a secret.
-    After deployment, <code>outputs.tf</code> displays all relevant resource names and URLs in the terminal.
+    The Web App's Managed Identity <code>principal_id</code> is passed from the <code>appservice</code> module into both <code>storage</code>
+    and <code>keyvault</code>, so those modules can grant it access. After deployment, <code>outputs.tf</code> displays all relevant
+    resource names and URLs in the terminal. The <code>app/</code> directory holds the Flask application that runs on top of this
+    infrastructure, and <code>.github/workflows/deploy.yml</code> builds and deploys it.
   </p>
 
   <!-- 4. APPROACH -->
-  <h2>4. Approach & Reasoning</h2>
+  <h2>4. Approach &amp; Reasoning</h2>
 
   <h3>Modular structure</h3>
   <p>
@@ -180,9 +228,24 @@ terraform apply</pre>
     The root <code>main.tf</code> acts as the orchestrator: it passes values into each module and connects their outputs where needed.
   </p>
   <p>
-    This separation has a practical benefit for this project: in Part II, nothing in the existing code needs to be modified.
-    New resources, pipeline configuration, and application settings are simply added on top.
-    Had everything been written in one file, adding Part II would require editing existing resources, which risks unintended changes or data loss.
+    This separation had a practical benefit in Part II: nothing in the existing Part I resources needed to be replaced.
+    The new role assignment, access policy, and app settings were simply added on top of the existing modules.
+    Had everything been written in one file, adding Part II would have meant editing existing resources directly, which risks unintended changes or data loss.
+  </p>
+
+  <h3>Resolving the module dependency between App Service, Storage and Key Vault</h3>
+  <p>
+    Granting the Web App's Managed Identity access to Storage and Key Vault creates a two-directional need: the
+    <code>storage</code> and <code>keyvault</code> modules need the Web App's <code>principal_id</code> to create their role
+    assignment / access policy, while the <code>appservice</code> module needs the Key Vault URI and Storage Account name to
+    configure its app settings. Referencing those values directly as module outputs in both directions would create a circular
+    dependency between modules (<code>appservice → keyvault → appservice</code>), which Terraform cannot resolve.
+  </p>
+  <p>
+    The dependency is broken by computing the Key Vault URI and Storage Account name in the root module directly from the
+    shared naming convention (<code>project_name</code> / <code>environment</code>), rather than reading them back from the
+    other modules' outputs. The <code>appservice</code> module therefore only depends on the Resource Group, so its
+    <code>principal_id</code> is available immediately for <code>storage</code> and <code>keyvault</code> to consume.
   </p>
 
   <h3>Key Vault for sensitive data</h3>
@@ -191,9 +254,11 @@ terraform apply</pre>
     Storing it directly in application code or committing it to Git would expose it to anyone with access to the repository.
   </p>
   <p>
-    Instead, Terraform reads the access key from the Storage Account after creation and stores it automatically as a secret in Azure Key Vault.
-    The application in Part II will retrieve this secret at runtime, meaning the actual credential never appears in code or configuration files.
-    Access to the Key Vault is controlled via Access Policies: the developer has full access during deployment, and the App Service will be granted read-only access in Part II.
+    Terraform reads the access key from the Storage Account after creation and stores it automatically as a secret in Azure Key Vault.
+    Access to the Key Vault is controlled via Access Policies: the developer has full access during deployment, and the Web App's
+    Managed Identity is granted read-only (<code>Get</code>, <code>List</code>) access. In practice, the application does not
+    currently read this secret at runtime — it authenticates to Storage directly via its Managed Identity — but the access
+    policy demonstrates that the same identity model extends uniformly to Key Vault as well.
   </p>
 
   <h3>Managed Identity instead of passwords</h3>
@@ -202,32 +267,52 @@ terraform apply</pre>
     The problem with this approach is that the secret needs to be stored somewhere: in environment variables, configuration files, or a pipeline, which creates another credential that can be accidentally exposed.
   </p>
   <p>
-    By assigning the App Service a System-Assigned Managed Identity, Azure manages the authentication automatically.
-    The application proves its identity to the Key Vault through Azure's internal infrastructure, so no password is ever created, stored, or rotated manually.
-    This removes an entire category of credential management from the project.
+    By assigning the Web App a System-Assigned Managed Identity and granting it the <strong>Storage Blob Data Contributor</strong>
+    role (scoped to read/write/delete blobs only, not account keys or account-level settings), Azure manages the authentication
+    automatically. The application authenticates via the <code>azure-identity</code> SDK's <code>DefaultAzureCredential</code>,
+    which uses the Managed Identity when running on Azure and falls back to the developer's own <code>az login</code> session
+    locally — so no password is ever created, stored, or rotated manually, and the same code works in both environments.
   </p>
 
   <h3>Full infrastructure defined in Part I</h3>
   <p>
-    The App Service, Key Vault, and Storage Account are all provisioned in Part I, even though the application code is not written until Part II.
+    The App Service, Key Vault, and Storage Account are all provisioned in Part I, even though the application code was not written until Part II.
     These resources form the foundation the web application needs to run securely in the cloud.
   </p>
   <p>
     Provisioning everything upfront also avoids a practical problem with Terraform: if a resource is created, used to store data, and then needs to be replaced in a later apply, Terraform must destroy the existing resource first.
-    This would delete any data already stored in it. By defining the full infrastructure from the beginning, Part II can simply extend what is already there without triggering any destructive changes.
+    This would delete any data already stored in it. By defining the full infrastructure from the beginning, Part II could extend what was already there — adding a role assignment, an access policy, and app settings — without triggering any destructive changes (confirmed via <code>terraform plan</code>: 2 to add, 1 to change, 0 to destroy).
   </p>
 
   <h3>Upload authentication</h3>
   <p>
-    The Storage Account currently permits GET, POST and PUT requests from any origin via CORS.
-    This is intentional at the infrastructure level: the Storage Account itself does not need to know who is allowed to upload files, because uploads do not go directly from the browser to Azure Storage.
-    Instead, the request flows through the App Service, which acts as an intermediary:
+    The Storage Account permits GET, POST and PUT requests from any origin via CORS, and the application's <code>/upload</code>
+    route has no login or access control of its own. This is intentional at both the infrastructure and application level: the
+    Storage Account itself does not need to know who is allowed to upload files, because uploads do not go directly from the
+    browser to Azure Storage. Instead, the request flows through the App Service, which acts as an intermediary:
   </p>
-  <pre>Browser → App Service → Storage Account</pre>
+  <pre>Browser → App Service (Flask, Managed Identity) → Storage Account</pre>
   <p>
-    The App Service is the only component that communicates directly with the Storage Account.
-    Authentication, meaning deciding whether a specific user is allowed to upload, is therefore handled in the application code in Part II, not by Terraform.
-    Terraform governs access at the Azure infrastructure level; the application governs access at the user level.
+    The App Service is the only component that communicates directly with the Storage Account, using its own identity — the
+    browser never receives or needs any Azure credential. Deciding whether a specific user is allowed to upload is an
+    application-level concern that was deliberately left out of scope for this project (see Known Limitations): anyone with the
+    application URL can currently upload and download files. Terraform governs access at the Azure infrastructure level; the
+    application would govern access at the user level if user-facing authentication were added.
+  </p>
+
+  <h3>CI/CD without stored secrets</h3>
+  <p>
+    The GitHub Actions pipeline (<code>.github/workflows/deploy.yml</code>) builds, tests, and deploys the application in three
+    jobs: <code>build</code> (install dependencies, compile-check, run smoke tests against the Flask routes, package the app),
+    <code>deploy</code> (log in to Azure and push the package to the Web App), and <code>verify</code> (poll the deployed
+    <code>/healthz</code> endpoint to confirm the deployment actually succeeded).
+  </p>
+  <p>
+    Authentication from GitHub Actions to Azure uses OIDC / Workload Identity Federation rather than a stored client secret,
+    following the same no-stored-credential principle used for the application's own access to Storage and Key Vault. GitHub
+    issues a short-lived signed token per workflow run; Azure AD trusts it for this specific repository (and, since the
+    <code>deploy</code> job runs under a GitHub <em>environment</em>, for that environment specifically) and exchanges it for a
+    short-lived Azure access token.
   </p>
 
   <!-- 5. KNOWN LIMITATIONS -->
@@ -243,49 +328,78 @@ terraform apply</pre>
   <p>
     The infrastructure currently only has a single environment (<code>dev</code>).
     In a production context, separate environments (e.g. staging, prod) would be used so that changes can be tested before affecting live data.
+    The deployment pipeline likewise deploys directly to this single environment with no staging slot or blue-green deployment.
     For this project scope, a single environment is sufficient.
   </p>
 
-  <h3>Local Terraform state</h3>
+  <h3>Remote Terraform state (addressed)</h3>
   <p>
-    The Terraform state file (<code>terraform.tfstate</code>) is stored locally on the developer's machine.
-    This means only the person who ran <code>terraform apply</code> can manage the infrastructure, and if the file is lost, Terraform loses track of all created resources.
-    In a production setup, the state would be stored remotely in an Azure Storage Account (Remote Backend).
-    However, this introduces a chicken-and-egg problem: the Storage Account is created by Terraform, but Terraform needs the Storage Account to exist before it can start.
-    The solution is to create a separate Storage Account manually in the Azure Portal solely for the state, before running Terraform for the first time.
-    For this project, local state is acceptable as it is managed by a single developer.
+    The Terraform state file (<code>terraform.tfstate</code>) was originally stored only locally on the developer's machine,
+    meaning only the person who ran <code>terraform apply</code> could manage the infrastructure, and a lost file would mean
+    Terraform losing track of all created resources. This has since been addressed with a <code>bootstrap/</code> directory:
+    a small, separate Terraform configuration that creates a dedicated Storage Account solely for holding the main project's
+    state, solving the chicken-and-egg problem where the main Storage Account is created by Terraform but a remote backend
+    needs a Storage Account to exist first. See <code>bootstrap/main.tf</code> and the commented-out
+    <code>backend "azurerm" {}</code> block in <code>providers.tf</code> for the exact migration steps. The bootstrap
+    configuration's own state remains local, since it consists of a handful of resources that essentially never change
+    after creation.
   </p>
 
-  <h3>Public blob container</h3>
+  <h3>Globally unique resource names (addressed)</h3>
   <p>
-    The images container is set to public blob access, meaning anyone who knows the URL of a file can access it directly.
-    For sensitive data this would be a problem. For this project, which stores images intended to be displayed on a public web page, public read access is intentional.
+    Storage Account and Key Vault names must be unique across all of Azure, not just within this subscription. Relying on
+    <code>project_name</code> alone risked a naming collision with someone else's resource of the same name. A
+    <code>random_string</code> resource now generates a short suffix once (kept stable in the state file across subsequent
+    applies) and appends it to both names, e.g. <code>stcloudprojectdevab12c</code>.
+  </p>
+
+  <h3>Consistent authorization model (addressed)</h3>
+  <p>
+    Storage access for the Web App's Managed Identity was already implemented as an Azure RBAC role assignment
+    (<strong>Storage Blob Data Contributor</strong>). Key Vault access, however, originally used the older,
+    Key-Vault-specific Access Policy model instead of RBAC — two different authorization systems within the same project.
+    The Key Vault now has <code>enable_rbac_authorization = true</code>, and both the developer's own access
+    (<strong>Key Vault Administrator</strong>) and the Web App's access (<strong>Key Vault Secrets User</strong>) are
+    granted via <code>azurerm_role_assignment</code>, consistent with the Storage Account.
+  </p>
+
+  <h3>Deployment identity (addressed, optional)</h3>
+  <p>
+    By default, <code>terraform apply</code> is run authenticated as the developer's own Azure AD user via
+    <code>az login</code>. As an alternative, <code>spn-deployment-notes.md</code> documents creating a dedicated Service
+    Principal for Terraform deployments specifically — separate from the Service Principal used by the GitHub Actions
+    pipeline, since the two serve different actors and purposes (a human running Terraform locally vs. an automated
+    pipeline deploying application code). This is offered as an option rather than a requirement, since a
+    single-developer student project does not strictly need this separation, but it demonstrates the pattern used in
+    team/production settings.
+  </p>
+
+  <h3>Public blob container and unauthenticated upload</h3>
+  <p>
+    The images container is set to public blob access, meaning anyone who knows the URL of a file can access it directly, and the
+    application's upload page has no access control — anyone with the application URL can upload or download files. For sensitive
+    data or a multi-user production system, this would be a problem and would need application-level authentication (e.g. login,
+    API keys, or a reverse proxy with access rules). For this project, which stores images intended to be displayed on a public
+    web page, both decisions are intentional and within the agreed project scope.
+  </p>
+
+  <h3>Key Vault secret unused by the application</h3>
+  <p>
+    The Storage Account access key stored in Key Vault during Part I is not read by the Part II application, since the
+    application authenticates to Storage via Managed Identity directly. It is retained to demonstrate that the secret-storage
+    pattern from Part I still works correctly alongside the newer Managed Identity-based access added in Part II.
   </p>
 
   <h3>No monitoring</h3>
   <p>
-    There are no alerts, diagnostics, or logging resources configured.
+    There are no alerts, diagnostics, or logging resources configured beyond the pipeline's own <code>verify</code> step and the
+    application's <code>/healthz</code> endpoint.
     If the application crashes or unexpected usage occurs (e.g. a large number of uploads), there is no automated notification.
     In a production setup, Azure Monitor and Application Insights would be added to the infrastructure.
   </p>
 
-  <!-- 6. OUTLOOK PART II -->
-  <h2>6. Outlook: Part II</h2>
-  <p>Part II extends this infrastructure with application code and a deployment pipeline. The following will be added:</p>
-  <table>
-    <tr><th>Component</th><th>Description</th></tr>
-    <tr><td>Web Page 1</td><td>Lists all files in the Storage Account with a download link for each</td></tr>
-    <tr><td>Web Page 2</td><td>Upload form to add images to the Storage Account</td></tr>
-    <tr><td>Pipeline (YAML)</td><td>Automatically builds and deploys the application when code is pushed to Git</td></tr>
-    <tr><td>Key Vault access for App</td><td>Access policy added so the App Service can read the storage credentials at runtime</td></tr>
-    <tr><td>App Settings</td><td>KEY_VAULT_URI and STORAGE_CONTAINER_NAME added to the Web App configuration</td></tr>
-  </table>
-  <p>
-    The infrastructure defined in Part I requires no changes. Part II only adds to it.
-  </p>
-
   <footer>
-    Cloud & DevOps Engineering &nbsp;·&nbsp; Aalen University &nbsp;·&nbsp; Part I · Terraform on Azure
+    Cloud &amp; DevOps Engineering &nbsp;·&nbsp; Aalen University &nbsp;·&nbsp; Part I &amp; II · Terraform on Azure
   </footer>
 
 </body>
