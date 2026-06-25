@@ -15,7 +15,7 @@ trigger:
       - azure-pipelines.yml
 
 variables:
-  azureWebAppName: 'app-husi42firstwebapp-dev'
+  azureWebAppName: 'app-webapphusi42-dev'
   pythonVersion: '3.11'
   appDirectory: 'app'
   azureServiceConnection: 'azure-cloud-project-connection'
