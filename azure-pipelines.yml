@@ -1,0 +1,137 @@
+# Azure DevOps Pipeline: Build, Deploy, Verify
+# Äquivalent zu .github/workflows/deploy.yml, übersetzt für Azure DevOps.
+#
+# Voraussetzung: Service Connection "azure-cloud-project-connection" wurde
+# in Project Settings -> Service connections angelegt (Service Principal +
+# Client Secret, Contributor-Rolle auf der Resource Group rg-husi42firstwebapp-dev).
+
+trigger:
+  branches:
+    include:
+      - master
+  paths:
+    include:
+      - app/*
+      - azure-pipelines.yml
+
+variables:
+  azureWebAppName: 'app-husi42firstwebapp-dev'
+  pythonVersion: '3.11'
+  appDirectory: 'app'
+  azureServiceConnection: 'azure-cloud-project-connection'
+  vmImageName: 'ubuntu-latest'
+
+stages:
+
+  # ─────────────────────────────────────────────
+  # Stage 1: Build
+  # ─────────────────────────────────────────────
+  - stage: Build
+    displayName: 'Build'
+    jobs:
+      - job: Build
+        displayName: 'Build and test the Flask app'
+        pool:
+          vmImage: $(vmImageName)
+        steps:
+          - task: UsePythonVersion@0
+            displayName: 'Set up Python $(pythonVersion)'
+            inputs:
+              versionSpec: '$(pythonVersion)'
+
+          - script: |
+              python -m pip install --upgrade pip
+              pip install -r requirements.txt
+            workingDirectory: '$(appDirectory)'
+            displayName: 'Install dependencies'
+
+          - script: |
+              python -m py_compile app.py
+            workingDirectory: '$(appDirectory)'
+            displayName: 'Compile check (catches syntax errors before deployment)'
+
+          - script: |
+              python -c "
+              from app import app
+              client = app.test_client()
+              assert client.get('/healthz').status_code == 200
+              assert client.get('/upload').status_code == 200
+              assert client.get('/').status_code == 200
+              print('Smoke tests passed.')
+              "
+            workingDirectory: '$(appDirectory)'
+            displayName: 'Smoke-test Flask routes (no live Azure connection needed)'
+            env:
+              AZURE_STORAGE_ACCOUNT_NAME: 'dummyaccountfortest'
+              AZURE_STORAGE_CONTAINER_NAME: 'images'
+
+          - task: ArchiveFiles@2
+            displayName: 'Package application'
+            inputs:
+              rootFolderOrFile: '$(System.DefaultWorkingDirectory)/$(appDirectory)'
+              includeRootFolder: false
+              archiveType: 'zip'
+              archiveFile: '$(Build.ArtifactStagingDirectory)/release.zip'
+              replaceExistingArchive: true
+
+          - task: PublishBuildArtifacts@1
+            displayName: 'Upload build artifact'
+            inputs:
+              PathtoPublish: '$(Build.ArtifactStagingDirectory)/release.zip'
+              ArtifactName: 'webapp-package'
+              publishLocation: 'Container'
+
+  # ─────────────────────────────────────────────
+  # Stage 2: Deploy
+  # ─────────────────────────────────────────────
+  - stage: Deploy
+    displayName: 'Deploy'
+    dependsOn: Build
+    condition: succeeded()
+    jobs:
+      - deployment: Deploy
+        displayName: 'Deploy to Azure Web App'
+        pool:
+          vmImage: $(vmImageName)
+        environment: 'production'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: AzureWebApp@1
+                  displayName: 'Deploy to Azure Web App'
+                  inputs:
+                    azureSubscription: '$(azureServiceConnection)'
+                    appType: 'webAppLinux'
+                    appName: '$(azureWebAppName)'
+                    package: '$(Pipeline.Workspace)/webapp-package/release.zip'
+
+  # ─────────────────────────────────────────────
+  # Stage 3: Verify
+  # ─────────────────────────────────────────────
+  - stage: Verify
+    displayName: 'Verify'
+    dependsOn: Deploy
+    condition: succeeded()
+    jobs:
+      - job: Verify
+        displayName: 'Check health endpoint'
+        pool:
+          vmImage: $(vmImageName)
+        steps:
+          - script: |
+              echo "Waiting for app to warm up..."
+              sleep 30
+            displayName: 'Wait for app to warm up'
+
+          - script: |
+              url="https://$(azureWebAppName).azurewebsites.net/healthz"
+              echo "Checking $url"
+              status=$(curl -s -o /dev/null -w "%{http_code}" "$url")
+              echo "Status: $status"
+              if [ "$status" != "200" ]; then
+                echo "Health check failed with status $status"
+                exit 1
+              fi
+              echo "Deployment verified successfully."
+            displayName: 'Check health endpoint'
